@@ -22,6 +22,10 @@ public class Livro {
 
     Boolean emprestado;
 
+    @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JoinColumn(name = "leitor_id", nullable = true)
+    Leitor leitor;
+
     public Livro(){
         emprestado = false;
     }

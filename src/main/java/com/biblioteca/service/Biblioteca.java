@@ -1,28 +1,37 @@
 package com.biblioteca.service;
 
 import com.biblioteca.dao.LivroDAO;
-import com.biblioteca.model.Autor;
-import com.biblioteca.model.Editora;
+
+import com.biblioteca.dao.leitorDAO;
+import com.biblioteca.model.Leitor;
 import com.biblioteca.model.Livro;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+
 import java.util.Scanner;
 
 public class Biblioteca {
 
-   private final LivroDAO dao;
+   private final LivroDAO livroDAO = new LivroDAO();
+   private final leitorDAO leitorDAO = new leitorDAO();
+
    private final Scanner scanner = new Scanner(System.in);
 
+   Leitor leitor;
+
     public Biblioteca() {
-       this.dao = new LivroDAO();
     }
 
+
+    //Principal
     public void rodar() throws Throwable {
+        if (!this.login()){
+            return;
+        }
+
         while (true){
             String option;
 
@@ -43,23 +52,74 @@ public class Biblioteca {
                 }
             }
         }
+    }
 
+    public boolean login() throws Throwable {
 
+        while (true){
+            System.out.println("ENTRE OU CRIE UMA CONTA NA BIBLIOTECA: " +
+                    "\n 1 - ENTRAR" +
+                    "\n 2 - CADASTRAR" +
+                    "\n 3 - SAIR");
 
+            String option = scanner.nextLine();
+
+            switch (option){
+                case "1" -> {
+                    System.out.println("DIGITE SEU ID: ");
+                    Long id = scanner.nextLong();
+                    scanner.nextLine();
+
+                   this.leitor = leitorDAO.buscarLeitorID(id);
+
+                    if (leitor != null){
+                        System.out.println("USUARIO LOGADO COM SUCESSO: " + leitor.getNome());
+                        return false;
+                    }else {
+                        System.out.println("FALHA AO LOGAR");
+                    }
+
+                }
+
+                case "2" -> {
+                    System.out.println("DIGITE SEU NOME PARA CADASTRO: ");
+                    String nome = scanner.nextLine();
+
+                    this.leitor = leitorDAO.novoLeitor(nome);
+
+                    if (leitor != null){
+                        System.out.println("CADASTRADO COM SUCESSO");
+                        return false;
+                    }else {
+                        System.out.println("ERRO AO CADASTRAR");
+                    }
+                }
+
+                case "3" -> {
+                    return false;
+                }
+
+                default -> {
+                    System.out.println("OPÇÃO INVÁLIDA");
+                }
+
+            }
+        }
     }
 
 
+    //Funções:
     public void emprestarLivro(){
         System.out.println("DIGITE O NOME DO LIVRO: ");
         String titulo = scanner.nextLine();
-        Livro livro = dao.buscarLivroTitulo(titulo);
+        Livro livro = livroDAO.buscarLivroTitulo(titulo);
 
         if (livro == null){
             System.out.println("LIVRO NÃO EXISTE");
             return;
         }
 
-        if (!dao.isLivroEmprestado(livro)){
+        if (!livroDAO.isLivroEmprestado(livro)){
             System.out.println("LIVRO SENDO EMPRESTADO");
             livro.setEmprestado(true);
         }else {
@@ -81,35 +141,22 @@ public class Biblioteca {
 
         HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 
-        convertJSON(httpResponse.body(), isbn);
-        httpClient.close();
-
-    }
-
-    private void convertJSON(String json, String isbn) throws Exception {
-        ObjectMapper objectMapper = new ObjectMapper();
-
-        JsonNode jsonNode = objectMapper.readTree(json);
-
-        String chave = jsonNode.fieldNames().next();
-        JsonNode livroNode = jsonNode.get(chave);
-
-        Livro livro = new Livro();
-
-        livro.setTitulo(livroNode.get("title").asText());
-        livro.setISBN(isbn);
-        livro.setAutor(new Autor(livroNode.get("authors").get(0).get("name").asText()));
-        livro.setEditora(new Editora(livroNode.get("publishers").get(0).get("name").asText()));
+        API_service apiService = new API_service();
+        Livro livro =  apiService.convertJSON(httpResponse.body(), isbn);
 
         try{
-            dao.Insert(livro);
+
+            livroDAO.Insert(livro);
 
             System.out.println("TITULO: " + livro.getTitulo());
             System.out.println("AUTOR: " + livro.getAutor().getNome());
             System.out.println("EDITORA: " + livro.getEditora().getNome());
+
             System.out.println("LIVRO ADICIONADO COM SUCESSO");
+
         }catch (Exception e){
             throw new Exception("ERRO AO ADICIONAR LIVRO");
         }
+        httpClient.close();
     }
 }
